@@ -32,3 +32,4 @@ class SEUnetResnet50(UnetResnet50):
         self.up4 = nn.Sequential(self.up4, SEBlock(1024))
         self.up3 = nn.Sequential(self.up3, SEBlock(512))
         self.up2 = nn.Sequential(self.up2, SEBlock(256))
+
