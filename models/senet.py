@@ -1,8 +1,6 @@
-import torch
 import torch.nn as nn
-import torchvision
 
-from models.unet import UnetConvBlock, UnetBlockUp, UnetResnet50
+from models.unet import UnetResnet50
 
 class SEBlock(nn.Module):
     def __init__(self, in_ch, ratio=16):
@@ -31,3 +29,6 @@ class SEUnetResnet50(UnetResnet50):
         self.down3 = nn.Sequential(self.down3, SEBlock(512))
         self.down4 = nn.Sequential(self.down4, SEBlock(1024))
 
+        self.up4 = nn.Sequential(self.up4, SEBlock(1024))
+        self.up3 = nn.Sequential(self.up3, SEBlock(512))
+        self.up2 = nn.Sequential(self.up2, SEBlock(256))
