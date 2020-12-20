@@ -12,7 +12,9 @@ class SEBlock(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.gate = nn.Sequential(
             nn.Conv2d(in_ch, in_ch // ratio, 1, 1),
-            nn.Conv2d(in_ch // ratio, in_ch, 1, 1)
+            nn.ReLU(),
+            nn.Conv2d(in_ch // ratio, in_ch, 1, 1),
+            nn.Sigmoid()
         )
 
     def forward(self, x):
