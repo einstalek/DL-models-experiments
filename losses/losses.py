@@ -8,7 +8,7 @@ class DICEMetrics:
         self.num_classes = num_classes
 
     def __call__(self, outputs, targets):
-        batch_size = outputs.size(0)
+        batch_size = outputs.fmap_size(0)
         outputs = outputs.view(batch_size, self.num_classes, -1)
         targets = targets.view(batch_size, self.num_classes, -1)
         nominator = (outputs * targets).sum(dim=2)
@@ -32,6 +32,6 @@ class BCEDICELoss:
         if self.size_average:
             bce_loss = self.loss_weights['bce'] * self.bce_loss(outputs, targets)
         else:
-            bce_loss = (self.loss_weights['bce'] * self.bce_loss(outputs, targets)).view(outputs.size(0), -1).mean()
+            bce_loss = (self.loss_weights['bce'] * self.bce_loss(outputs, targets)).view(outputs.fmap_size(0), -1).mean()
         return bce_loss \
                + self.loss_weights['dice'] * (1 - self.dice_loss(outputs, targets))

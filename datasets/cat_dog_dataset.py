@@ -28,11 +28,11 @@ def parse_xml(fp):
                     obj['difficult'] = int(xx.text)
         elif x.tag == 'filename':
             obj['filename'] = x.text
-        elif x.tag == 'size':
+        elif x.tag == 'fmap_size':
             size =  []
             for xx in x:
                 size.append(int(xx.text))
-            obj['size'] = size
+            obj['fmap_size'] = size
     return obj
 
 
