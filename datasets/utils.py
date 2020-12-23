@@ -14,7 +14,8 @@ def match_anchors_with_boxes(anchors, boxes, match_iou=0.5, ignore_iou=0.4):
         - ignore anchors bool  mask
         - negative anchors bool  mask
     """
-    iou = ops.box_iou(anchors, boxes)  # AxN
+    iou = ops.box_iou(ops.box_convert(anchors, "xywh", "xyxy"),
+                      ops.box_convert(boxes, "xywh", "xyxy"))  # AxN
     vals, matched_box_idx = torch.max(iou, 1)
     positive = vals >= match_iou
     ignore = torch.logical_and(vals >= ignore_iou, vals < match_iou)
@@ -47,6 +48,13 @@ def get_targets(anchors, gt_boxes, cls_labels, xy_std=0.1, wh_std=0.2):
 
 
 def encode_batch(anchors, boxes, labels):
+    """
+
+    :param anchors: [A, 4]
+    :param boxes: [B, N, 4], xywh
+    :param labels: [B, N]
+    :return:
+    """
     cls_target, regr_target = [], []
     batch = boxes.size(0)
     for i in range(batch):

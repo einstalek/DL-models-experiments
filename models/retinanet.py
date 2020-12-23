@@ -76,7 +76,7 @@ class RetinaNet(nn.Module):
         self.fpn = FPN(*fmap_channels, out_ch=256)
         self.class_subnet = RetinaConvHead(num_classes * self.anchors_num)
         self.regr_subnet = RetinaConvHead(4 * self.anchors_num)
-        self.anchors = generate_anchor_boxes(fmap_sizes, 8, img_size, scales, ratios)
+        self.anchors = generate_anchor_boxes(fmap_sizes, 8, img_size, scales, ratios, mode="xywh")
         self.num_classes = num_classes
 
     def forward(self, x):

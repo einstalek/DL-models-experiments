@@ -21,7 +21,7 @@ def plot_bbox(box, mode="xywh"):
 
 def generate_anchor_boxes(fmap_sizes, subsample, img_size,
                           scales, ratios,
-                          mode="x1y2x2y2", clip=True):
+                          mode="xywh", clip=True):
     anchors = []
     for fmap_size in fmap_sizes:
         H = W = fmap_size
@@ -55,7 +55,7 @@ def generate_anchor_boxes(fmap_sizes, subsample, img_size,
 
 if __name__ == "__main__":
     A = generate_anchor_boxes((32, 16, 8), 8, 256,
-                              scales=(0.5, 0.75), ratios=(1, 2, 0.5),
+                              scales=(0.5, 0.75, 1.25), ratios=(1, 2, 0.5),
                               mode="xywh", clip=False)
     print(A.shape)  # sum(r * s * size**2)
     img = np.zeros((256, 256, 3))
