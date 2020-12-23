@@ -49,13 +49,12 @@ class Resnet50(nn.Module):
 
 
 class RetinaConvHead(nn.Module):
-    def __init__(self, out_ch, in_ch=256, activatiton=None):
+    def __init__(self, out_ch, in_ch=256):
         super(RetinaConvHead, self).__init__()
         self.conv = [nn.Conv2d(in_ch, in_ch, 3, padding=1) for _ in range(4)]
         self.bn = [nn.BatchNorm2d(in_ch) for _ in range(4)]
         self.relu = nn.ReLU()
         self.final = nn.Conv2d(in_ch, out_ch, 3, padding=1)
-        self.activatiton = activatiton
 
     def forward(self, x):
         for i in range(4):
@@ -63,43 +62,30 @@ class RetinaConvHead(nn.Module):
             x = self.relu(x)
             x = self.bn[i](x)
         x = self.final(x)
-        if self.activatiton == 'sigmoid':
-            x = x.sigmoid()
         return x
 
 
 class RetinaNet(nn.Module):
     def __init__(self, pretrained=False, num_classes=2,
-                 img_size=256, scales=(0.5,), ratios=(1, 0.5, 2)):
+                 img_size=256, scales=(0.5, 0.25), ratios=(1, 0.5, 2)):
         super(RetinaNet, self).__init__()
         self.backbone = Resnet50(pretrained)
-        fmap_sizes = (512, 1024, 2048)
-        anchors = len(ratios) * len(scales)
-        self.fpn = FPN(*fmap_sizes, out_ch=256)
-        self.class_subnet = RetinaConvHead(num_classes * anchors, activatiton="sigmoid")
-        self.regr_subnet = RetinaConvHead(4 * anchors)
+        fmap_sizes = (32, 16, 8)
+        fmap_channels = (512, 1024, 2048)
+        self.anchors_num = len(ratios) * len(scales)
+        self.fpn = FPN(*fmap_channels, out_ch=256)
+        self.class_subnet = RetinaConvHead(num_classes * self.anchors_num)
+        self.regr_subnet = RetinaConvHead(4 * self.anchors_num)
         self.anchors = generate_anchor_boxes(fmap_sizes, 8, img_size, scales, ratios)
+        self.num_classes = num_classes
 
     def forward(self, x):
+        bsize = x.size(0)
         fmaps = self.backbone(x)
         fpn_maps = self.fpn(*fmaps)
         class_out = []
         regr_out = []
         for fmap in fpn_maps:
-            class_out.append(self.class_subnet(fmap))
-            regr_out.append(self.regr_subnet(fmap))
-        return class_out, regr_out
-
-
-if __name__ == "__main__":
-    # retina = RetinaNet(num_classes=1)
-    # inp = torch.zeros(1, 3, 256, 256)
-    # out = retina(inp)
-    # print([x.shape for x in out[0]])
-    inp = torch.rand(4, 3, 32, 32)
-    x = inp.view(4, -1, 3)
-    x = torch.max(x, -1)[0]
-    x = torch.topk(x, 10, 1)[0]
-    print(x)
-
-
+            class_out.append(self.class_subnet(fmap).view(bsize, -1, self.num_classes))
+            regr_out.append(self.regr_subnet(fmap).view(bsize, -1, 4))
+        return torch.cat(class_out, 1), torch.cat(regr_out, 1)
