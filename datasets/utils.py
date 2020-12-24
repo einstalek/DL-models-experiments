@@ -40,7 +40,7 @@ def get_targets(anchors, gt_boxes, cls_labels, xy_std=0.1, wh_std=0.2):
     regr_target = torch.cat([
         (collected_gt_boxes[:, :2] - anchors[:, :2]) / anchors[:, 2:] / xy_std,  # (xy_gt - xy_a) / wh_a / std_xy
         torch.log(collected_gt_boxes[:, 2:] / anchors[:, 2:]) / wh_std,  # log(wh_gt / wh_a) / std_wh
-    ], 1)
+    ], 1).float()
     cls_target = cls_labels[matched_box_idx]
     cls_target[torch.where(negative)] = -1  # -1 for negative
     cls_target[torch.where(ignore)] = -2  # -2 for ignored
