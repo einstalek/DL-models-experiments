@@ -1,6 +1,7 @@
 import torch
 import torchvision
 import torch.nn as nn
+from torchvision import ops
 
 from models.anchors import generate_anchor_boxes
 
@@ -94,3 +95,37 @@ class RetinaNet(nn.Module):
             class_out.append(self.class_subnet(fmap).view(bsize, -1, self.num_classes))
             regr_out.append(self.regr_subnet(fmap).view(bsize, -1, 4))
         return torch.cat(class_out, 1), torch.cat(regr_out, 1)
+
+    def inference(self, cls_out, regr_out,
+                  max_iou=0.5, min_conf=0.2, k=50,
+                  xy_std=0.1, wh_std=0.2):
+        """
+        :param cls_out: [B, A, K]
+        :param regr_out: [B, A, 4]
+        :return:
+            -- boxes, [k, 4], xywh
+            -- scores
+        """
+        boxes = []
+        scores = []
+        conf, pred_labels = cls_out.sigmoid().max(-1)  # (B, A, 1)
+        bsize = cls_out.size(0)
+        for i in range(bsize):
+            filter_mask = torch.where(conf[i] > min_conf)
+            top_boxes = self.anchors[filter_mask]  # (N, 4)
+            top_conf = conf[i][filter_mask]  # (N,)
+            top_regr = regr_out[i][filter_mask]  # (N, 4)
+            pick_ids = ops.nms(ops.box_convert(top_boxes, "xywh", "xyxy"),
+                               top_conf, max_iou)
+            picked_boxes = top_boxes[pick_ids][:k]  # (k, 4)
+            picked_conf = top_conf[pick_ids][:k]  # (k,)
+            picked_regr = top_regr[pick_ids][:k]  # (k, 4)
+            xy = picked_boxes[:, 2:] * xy_std * picked_regr[:, :2] + picked_boxes[:, :2]
+            wh = picked_regr[:, 2:].exp() * wh_std * picked_boxes[:, 2:]
+            boxes.append(torch.cat([xy, wh], -1))
+            scores.append(picked_conf)
+        return boxes, scores
+
+
+
+
