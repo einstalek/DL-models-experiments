@@ -47,27 +47,25 @@ class FocalLoss:
         self.alpha = alpha
         self.gamma = gamma
         self._loss = nn.CrossEntropyLoss(reduction='none')
+        self._negative_index = -1
         self._ignore_index = -2
+        self.eps = 1e-6
 
     def __call__(self, outputs, targets):
         """
-        :param outputs: (B, A, K)
-        :param targets: (B, A), from {0, ..., K-1} + {-1, -2}
+        :param outputs: (B, A, K), class logits
+        :param targets: (B, A, K), {0, 1}
         :return:
-
-        Output is a matrix of logits for each targeet class  [p11, p12, ..., p1K]
-        If the target label L is from {0, ..., K-1}, then loss  would be  -log(1-p1n) - log(p1L)
-        If the target is -1 (background), the loss would be -log(1-p1n)
+            Output is a matrix of logits for each targeet class  [p11, p12, ..., p1K]
         """
-        positive_mask = targets >= 0
-        background_mask = targets == -1
+        # Filter out ignored anchors
+        filter_mask = torch.where(targets[..., 0] != self._ignore_index)
+        targets = targets[filter_mask]  # (N, K)
+        outputs = outputs[filter_mask]  # (N, K)
+
         probas = outputs.sigmoid()
-        foreground_targets = targets[torch.where(positive_mask)]  # (P,)
-        foreground_outputs = outputs[torch.where(positive_mask)]  # (P, K)
-        ce_loss = self._loss(foreground_outputs, foreground_targets)
-        pt_foreground = torch.gather(foreground_outputs, 1, foreground_targets[:, None]).sigmoid()  # probas of target classes
-        pt_background = 1 - probas[background_mask]  # (N, K)
-        return torch.mean(self.alpha * ce_loss * (1 - pt_foreground[:, 0]) ** self.gamma) - \
-            torch.mean((1 - self.alpha) * (1 - pt_background)**self.gamma * pt_background.log())
-
-
+        alpha = torch.where(targets != self._negative_index, self.alpha, 1-self.alpha)
+        pt = torch.where(targets != self._negative_index, probas, 1-probas)
+        pt = pt.clamp(self.eps, 1-self.eps)
+        loss = -alpha * (1 - pt)**self.gamma * pt.log()
+        return loss.mean()

@@ -51,8 +51,8 @@ class Resnet50(nn.Module):
 class RetinaConvHead(nn.Module):
     def __init__(self, out_ch, in_ch=256):
         super(RetinaConvHead, self).__init__()
-        self.conv = [nn.Conv2d(in_ch, in_ch, 3, padding=1) for _ in range(4)]
-        self.bn = [nn.BatchNorm2d(in_ch) for _ in range(4)]
+        self.conv = nn.ModuleList([nn.Conv2d(in_ch, in_ch, 3, padding=1) for _ in range(4)])
+        self.bn = nn.ModuleList([nn.BatchNorm2d(in_ch) for _ in range(4)])
         self.relu = nn.ReLU()
         self.final = nn.Conv2d(in_ch, out_ch, 3, padding=1)
 
@@ -80,6 +80,11 @@ class RetinaNet(nn.Module):
         self.num_classes = num_classes
 
     def forward(self, x):
+        """
+        :return:
+            -- class logits, [B, A, K]
+            -- regression  output, [B, A, 4]
+        """
         bsize = x.size(0)
         fmaps = self.backbone(x)
         fpn_maps = self.fpn(*fmaps)

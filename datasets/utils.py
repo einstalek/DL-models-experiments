@@ -23,7 +23,9 @@ def match_anchors_with_boxes(anchors, boxes, match_iou=0.5, ignore_iou=0.4):
     return matched_box_idx, positive, ignore, negative
 
 
-def get_targets(anchors, gt_boxes, cls_labels, xy_std=0.1, wh_std=0.2):
+def get_targets(anchors, gt_boxes, cls_labels, num_classes,
+                xy_std=0.1, wh_std=0.2,
+                negative_index=-1, ignore_index=-2):
     """
     :param anchors: [A, 4], "xywh"
     :param gt_boxes: [N, 4], "xywh"
@@ -32,7 +34,7 @@ def get_targets(anchors, gt_boxes, cls_labels, xy_std=0.1, wh_std=0.2):
     :param xy_std:
     :param wh_std:
     :return:
-        - classification target with classes, (A, 1)
+        - classification target with classes, (A, K)
         - regression target for boxes, (A, 4)
     """
     matched_box_idx, positive, ignore, negative = match_anchors_with_boxes(anchors, gt_boxes)
@@ -42,14 +44,16 @@ def get_targets(anchors, gt_boxes, cls_labels, xy_std=0.1, wh_std=0.2):
         torch.log(collected_gt_boxes[:, 2:] / anchors[:, 2:]) / wh_std,  # log(wh_gt / wh_a) / std_wh
     ], 1).float()
     cls_target = cls_labels[matched_box_idx]
-    cls_target[torch.where(negative)] = -1  # -1 for negative
-    cls_target[torch.where(ignore)] = -2  # -2 for ignored
-    return cls_target, regr_target
+    A_num = cls_target.size(0)
+    one_hot = torch.zeros(A_num, num_classes)
+    one_hot[torch.arange(A_num), cls_target] = 1
+    one_hot[torch.where(ignore)] = ignore_index
+    one_hot[torch.where(negative)] = negative_index
+    return one_hot, regr_target
 
 
-def encode_batch(anchors, boxes, labels):
+def encode_batch(anchors, boxes, labels, num_classes):
     """
-
     :param anchors: [A, 4]
     :param boxes: [B, N, 4], xywh
     :param labels: [B, N]
@@ -58,7 +62,7 @@ def encode_batch(anchors, boxes, labels):
     cls_target, regr_target = [], []
     batch = boxes.size(0)
     for i in range(batch):
-        cls, regr = get_targets(anchors, boxes[i], labels[i])
+        cls, regr = get_targets(anchors, boxes[i], labels[i], num_classes=num_classes)
         cls_target.append(cls[None])
         regr_target.append(regr[None])
     return torch.cat(cls_target), torch.cat(regr_target)
@@ -69,5 +73,6 @@ if __name__ == "__main__":
     boxes = torch.from_numpy(np.array([[10, 20, 120, 220],
                                        [120, 120, 250, 190],
                                        [0, 0, 50, 50]])).view(1, 3, 4)
-    labels = torch.from_numpy(np.array([0, 1, 2])).view(1, 3, 1)
-    targets = encode_batch(anchors, boxes, labels)
+    labels = torch.from_numpy(np.array([0, 1, 2])).view(1, 3)
+    targets = encode_batch(anchors, boxes, labels, 3)
+    print(targets[0])
