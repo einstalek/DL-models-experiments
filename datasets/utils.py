@@ -6,8 +6,8 @@ from models.anchors import generate_anchor_boxes
 
 def match_anchors_with_boxes(anchors, boxes, match_iou=0.5, ignore_iou=0.4):
     """
-    :param anchors: [A, 4], x1y1x2y2
-    :param boxes: [N, 4], x1y1x2y2
+    :param anchors: [A, 4], xywh
+    :param boxes: [N, 4], xywh
     :return:
         - matched_box_idx, [A], index of gt_box matched for each anchor
         - positive anchors bool  mask
