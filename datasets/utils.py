@@ -1,3 +1,5 @@
+from xml.etree import ElementTree as ET
+
 import numpy as np
 import torch
 from torchvision import ops
@@ -76,3 +78,31 @@ if __name__ == "__main__":
     labels = torch.from_numpy(np.array([0, 1, 2])).view(1, 3)
     targets = encode_batch(anchors, boxes, labels, 3)
     print(targets[0])
+
+
+def parse_xml(fp):
+    obj = {}
+    tree = ET.parse(fp)
+    root = tree.getroot()
+    for x in root:
+        if x.tag == 'object':
+            for xx in x:
+                if xx.tag == 'name':
+                    obj['name'] = xx.text
+                elif xx.tag == 'bndbox':
+                    box = []
+                    for xxx in xx:
+                        box.append(float(xxx.text))
+                    obj['bbox'] = box
+                elif xx.tag == 'occluded':
+                    obj['occluded'] = int(xx.text)
+                elif xx.tag == 'difficult':
+                    obj['difficult'] = int(xx.text)
+        elif x.tag == 'filename':
+            obj['filename'] = x.text
+        elif x.tag == 'fmap_size':
+            size =  []
+            for xx in x:
+                size.append(int(xx.text))
+            obj['fmap_size'] = size
+    return obj

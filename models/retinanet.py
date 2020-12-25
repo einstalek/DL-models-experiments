@@ -2,8 +2,11 @@ import torch
 import torchvision
 import torch.nn as nn
 from torchvision import ops
+import tqdm
 
+from datasets.utils import encode_batch
 from models.anchors import generate_anchor_boxes
+
 
 class FPN(nn.Module):
     def __init__(self, *sizes, out_ch):
@@ -79,6 +82,7 @@ class RetinaNet(nn.Module):
         self.regr_subnet = RetinaConvHead(4 * self.anchors_num)
         self.anchors = generate_anchor_boxes(fmap_sizes, 8, img_size, scales, ratios, mode="xywh")
         self.num_classes = num_classes
+        self.img_size = img_size
 
     def forward(self, x):
         """
@@ -99,15 +103,9 @@ class RetinaNet(nn.Module):
     def inference(self, cls_out, regr_out,
                   max_iou=0.5, min_conf=0.2, k=50,
                   xy_std=0.1, wh_std=0.2):
-        """
-        :param cls_out: [B, A, K]
-        :param regr_out: [B, A, 4]
-        :return:
-            -- boxes, [k, 4], xywh
-            -- scores
-        """
         boxes = []
         scores = []
+        labels = []
         conf, pred_labels = cls_out.sigmoid().max(-1)  # (B, A, 1)
         bsize = cls_out.size(0)
         for i in range(bsize):
@@ -115,17 +113,67 @@ class RetinaNet(nn.Module):
             top_boxes = self.anchors[filter_mask]  # (N, 4)
             top_conf = conf[i][filter_mask]  # (N,)
             top_regr = regr_out[i][filter_mask]  # (N, 4)
+            top_labels = pred_labels[i][filter_mask]
             pick_ids = ops.nms(ops.box_convert(top_boxes, "xywh", "xyxy"),
                                top_conf, max_iou)
             picked_boxes = top_boxes[pick_ids][:k]  # (k, 4)
-            picked_conf = top_conf[pick_ids][:k]  # (k,)
             picked_regr = top_regr[pick_ids][:k]  # (k, 4)
             xy = picked_boxes[:, 2:] * xy_std * picked_regr[:, :2] + picked_boxes[:, :2]
             wh = picked_regr[:, 2:].exp() * wh_std * picked_boxes[:, 2:]
-            boxes.append(torch.cat([xy, wh], -1))
-            scores.append(picked_conf)
-        return boxes, scores
+            box = torch.cat([xy, wh], -1)
+            box = ops.clip_boxes_to_image(ops.box_convert(box, "xywh", "xyxy"),
+                                          (self.img_size, self.img_size))
+            boxes.append(box)
+            scores.append(top_conf[pick_ids][:k])
+            labels.append(top_labels[pick_ids][:k])
+        return boxes, labels, scores
 
 
+def train_single_epoch(model, optimizer, anchors, dataloader, cls_crit, reg_crit, epoch, postfix_dict):
+    model.train()
+    total_step = len(dataloader)
+    total_loss = 0
+    tbar = tqdm.tqdm(enumerate(dataloader), total=total_step, position=0, leave=False)
+    for i, (images, boxes, labels) in tbar:
+        images = images.cuda()
+        boxes = boxes.cuda()
+        labels = labels.cuda()
+        cls_target, reg_target = encode_batch(anchors, boxes, labels, 2)
+        cls_target = cls_target.cuda()
+        reg_target = reg_target.cuda()
+
+        if (cls_target >= 0).sum(1).min() < 1:
+            continue
+
+        cls_out, reg_out = model(images)
+        cls_loss = cls_crit(cls_out, cls_target)
+        regr_loss = (reg_crit(reg_out, reg_target) * (cls_target >= 0)).mean()
+        loss = cls_loss + regr_loss
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+        postfix_dict['train/loss'] = loss.item()
+        postfix_dict['train/cls_loss'] = cls_loss.item()
+        postfix_dict['train/regr_loss'] = regr_loss.item()
+
+        f_epoch = epoch + i / total_step
+        desc = '{:5s}'.format('train')
+        desc += ', {:06d}/{:06d}, {:.2f} epoch'.format(i, total_step, f_epoch)
+        tbar.set_description(desc)
+        tbar.set_postfix(**postfix_dict)
+    total_loss /= len(dataloader)
+    return total_loss
 
 
+def evaluale_single_epoch(model: RetinaNet, dataloader, k=10):
+    model.eval()
+    total_step = len(dataloader)
+    total_loss = 0
+    tbar = tqdm.tqdm(enumerate(dataloader), total=total_step, position=0, leave=False)
+    for i, (images, boxes, labels) in tbar:
+        images = images.cuda()
+        boxes = boxes.cuda()
+        labels = labels.cuda()
+
+        cls_out, regr_out = model(images)
+        pred_boxes, _, _ = model.inference(cls_out, regr_out, k=k)
