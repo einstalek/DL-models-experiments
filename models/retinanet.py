@@ -224,7 +224,7 @@ def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, post
         cls_out, regr_out = model(images)
         cls_loss = cls_crit(cls_out, cls_target)
         regr_loss = (reg_crit(regr_out, reg_target) * (cls_target >= 0)).mean()
-        loss = cls_loss + regr_loss
+        loss = model.cls_weight * cls_loss + model.regr_weight * regr_loss
         postfix_dict['val/loss'] = loss.item()
 
         pred_boxes, pred_scores, pred_labels = model.inference(cls_out, regr_out, k=k)
