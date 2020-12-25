@@ -103,6 +103,20 @@ class RetinaNet(nn.Module):
     def inference(self, cls_out, regr_out,
                   max_iou=0.5, min_conf=0.2, k=50,
                   xy_std=0.1, wh_std=0.2):
+        """
+
+        :param cls_out: (B, A, K)
+        :param regr_out:
+        :param max_iou:
+        :param min_conf:
+        :param k:
+        :param xy_std:
+        :param wh_std:
+        :return:
+            -- boxes [B, k, 4]
+            -- scores [B, k]
+            -- labels [B, k]
+        """
         boxes = []
         scores = []
         labels = []
@@ -118,15 +132,18 @@ class RetinaNet(nn.Module):
                                top_conf, max_iou)
             picked_boxes = top_boxes[pick_ids][:k]  # (k, 4)
             picked_regr = top_regr[pick_ids][:k]  # (k, 4)
+            # gt_xy = A_wh * s_xy * dxdy + A_xy
             xy = picked_boxes[:, 2:] * xy_std * picked_regr[:, :2] + picked_boxes[:, :2]
+            # gt_wh = s_wh *  A_wh * exp(dwdh)
             wh = picked_regr[:, 2:].exp() * wh_std * picked_boxes[:, 2:]
             box = torch.cat([xy, wh], -1)
             box = ops.clip_boxes_to_image(ops.box_convert(box, "xywh", "xyxy"),
                                           (self.img_size, self.img_size))
-            boxes.append(box)
-            scores.append(top_conf[pick_ids][:k])
-            labels.append(top_labels[pick_ids][:k])
-        return boxes, labels, scores
+            box = ops.box_convert(box, "xyxy", "xywh")  # (k, 4)
+            boxes.append(box[None])
+            scores.append(top_conf[pick_ids][:k][None])
+            labels.append(top_labels[pick_ids][:k][None])
+        return torch.cat(boxes), torch.cat(labels), torch.cat(scores)
 
 
 def train_single_epoch(model, optimizer, anchors, dataloader, cls_crit, reg_crit, epoch, postfix_dict):
@@ -162,18 +179,38 @@ def train_single_epoch(model, optimizer, anchors, dataloader, cls_crit, reg_crit
         tbar.set_description(desc)
         tbar.set_postfix(**postfix_dict)
     total_loss /= len(dataloader)
-    return total_loss
 
 
-def evaluale_single_epoch(model: RetinaNet, dataloader, k=10):
+def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, postfix_dict, epoch, k=10):
     model.eval()
     total_step = len(dataloader)
-    total_loss = 0
     tbar = tqdm.tqdm(enumerate(dataloader), total=total_step, position=0, leave=False)
     for i, (images, boxes, labels) in tbar:
         images = images.cuda()
-        boxes = boxes.cuda()
+        boxes = boxes.cuda()  # (B, N, 4)
         labels = labels.cuda()
+        cls_target, reg_target = encode_batch(model.anchors, boxes, labels, 2)
+        cls_target = cls_target.cuda()
+        reg_target = reg_target.cuda()
 
         cls_out, regr_out = model(images)
-        pred_boxes, _, _ = model.inference(cls_out, regr_out, k=k)
+        cls_loss = cls_crit(cls_out, cls_target)
+        regr_loss = (reg_crit(regr_out, reg_target) * (cls_target >= 0)).mean()
+        loss = cls_loss + regr_loss
+        postfix_dict['val/loss'] = loss.item()
+        postfix_dict['val/cls_loss'] = cls_loss.item()
+        postfix_dict['val/regr_loss'] = regr_loss.item()
+
+        pred_boxes, pred_scores, pred_labels = model.inference(cls_out, regr_out, k=k)  # (B, k, _)
+        iou = ops.box_iou(ops.box_convert(boxes.view(-1, 4), "xywh", "xyxy"),
+                          ops.box_convert(pred_boxes.view(-1, 4), "xywh", "xyxy"))  # (B*N x B*k)
+        postfix_dict['val/iou'] = iou.mean()
+
+        f_epoch = epoch + i / total_step
+        desc = '{:5s}'.format('val')
+        desc += ', {:06d}/{:06d}, {:.2f} epoch'.format(i, total_step, f_epoch)
+        tbar.set_description(desc)
+        tbar.set_postfix(**postfix_dict)
+
+
+
