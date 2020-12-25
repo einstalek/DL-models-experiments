@@ -5,10 +5,9 @@ import albumentations as A
 transform_fn = A.Compose([
     A.RandomBrightnessContrast(),
     A.HorizontalFlip(),
-    A.Rotate(60),
     A.GaussNoise(),
     A.ChannelShuffle(),
-    A.RandomCropNearBBox(max_part_shift=0.2)
+    A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=60)
 ])
 
 normalize_fn = T.Compose([
