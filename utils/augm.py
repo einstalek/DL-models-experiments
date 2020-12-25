@@ -8,6 +8,7 @@ transform_fn = A.Compose([
     A.Rotate(60),
     A.GaussNoise(),
     A.ChannelShuffle(),
+    A.RandomCropNearBBox(max_part_shift=0.2)
 ])
 
 normalize_fn = T.Compose([
