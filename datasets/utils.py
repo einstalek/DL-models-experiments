@@ -16,8 +16,8 @@ def match_anchors_with_boxes(anchors, boxes, match_iou=0.5, ignore_iou=0.4):
         - ignore anchors bool  mask
         - negative anchors bool  mask
     """
-    iou = ops.box_iou(ops.box_convert(anchors, "xywh", "xyxy"),
-                      ops.box_convert(boxes, "xywh", "xyxy"))  # AxN
+    iou = ops.box_iou(ops.box_convert(anchors, "cxcywh", "xyxy"),
+                      ops.box_convert(boxes, "cxcywh", "xyxy"))  # AxN
     vals, matched_box_idx = torch.max(iou, 1)
     positive = vals >= match_iou
     ignore = torch.logical_and(vals >= ignore_iou, vals < match_iou)

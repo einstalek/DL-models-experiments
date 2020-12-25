@@ -132,7 +132,7 @@ class RetinaNet(nn.Module):
             top_conf = conf[i][filter_mask]  # (N,)
             top_regr = regr_out[i][filter_mask]  # (N, 4)
             top_labels = pred_labels[i][filter_mask]
-            pick_ids = ops.nms(ops.box_convert(top_boxes, "xywh", "xyxy"), top_conf, max_iou)
+            pick_ids = ops.nms(ops.box_convert(top_boxes, "cxcywh", "xyxy"), top_conf, max_iou)
             picked_boxes = top_boxes[pick_ids][:k]  # (k, 4)
             picked_regr = top_regr[pick_ids][:k]  # (k, 4)
             picked_scores, picked_labels = top_conf[pick_ids][:k], top_labels[pick_ids][:k]
@@ -141,11 +141,11 @@ class RetinaNet(nn.Module):
             # gt_wh = s_wh *  A_wh * exp(dwdh)
             wh = picked_regr[:, 2:].exp() * wh_std * picked_boxes[:, 2:]
             box = torch.cat([xy, wh], -1)
-            box_xyxy = ops.box_convert(box, "xywh", "xyxy")
+            box_xyxy = ops.box_convert(box, "cxcywh", "xyxy")
             box_xyxy = ops.clip_boxes_to_image(box_xyxy, (self.img_size, self.img_size))
             keep_ids = ops.remove_small_boxes(box_xyxy, min_size)
             box_xyxy = box_xyxy[keep_ids]
-            box = ops.box_convert(box_xyxy, "xyxy", "xywh")
+            box = ops.box_convert(box_xyxy, "xyxy", "cxcywh")
             boxes.append(box)
             scores.append(picked_scores[keep_ids])
             labels.append(picked_labels[keep_ids])
@@ -195,8 +195,8 @@ def eval_single_batch(boxes, gt_boxes):
     bsize = gt_boxes.size(0)
     total_iou = 0.
     for i in range(bsize):
-        pred = ops.box_convert(boxes[i], "xywh", "xyxy")
-        gt = ops.box_convert(gt_boxes[i], "xywh", "xyxy")
+        pred = ops.box_convert(boxes[i], "cxcywh", "xyxy")
+        gt = ops.box_convert(gt_boxes[i], "cxcywh", "xyxy")
         iou = ops.box_iou(gt, pred).mean().item()
         if np.isnan(iou):
             continue
