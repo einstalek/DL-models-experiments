@@ -83,6 +83,8 @@ class RetinaNet(nn.Module):
         self.anchors = generate_anchor_boxes(fmap_sizes, 8, img_size, scales, ratios, mode="xywh").float()
         self.num_classes = num_classes
         self.img_size = img_size
+        self.regr_weight = 1.
+        self.cls_weight = 1.
 
     def forward(self, x):
         """
@@ -148,7 +150,8 @@ class RetinaNet(nn.Module):
         return torch.cat(boxes), torch.cat(labels), torch.cat(scores)
 
 
-def train_single_epoch(model, optimizer, anchors, dataloader, cls_crit, reg_crit, epoch, postfix_dict):
+def train_single_epoch(model, optimizer, anchors, dataloader,
+                       cls_crit, reg_crit, epoch, postfix_dict):
     model.train()
     total_step = len(dataloader)
     total_loss = 0
@@ -167,7 +170,7 @@ def train_single_epoch(model, optimizer, anchors, dataloader, cls_crit, reg_crit
         cls_out, reg_out = model(images)
         cls_loss = cls_crit(cls_out, cls_target)
         regr_loss = (reg_crit(reg_out, reg_target) * (cls_target >= 0)).mean()
-        loss = cls_loss + regr_loss
+        loss = model.cls_weight * cls_loss + model.regr_weight * regr_loss
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
