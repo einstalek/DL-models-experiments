@@ -101,10 +101,11 @@ class RetinaNet(nn.Module):
         return torch.cat(class_out, 1), torch.cat(regr_out, 1)
 
     def inference(self, cls_out, regr_out,
-                  max_iou=0.5, min_conf=0.2, k=50,
+                  max_iou=0.5, min_conf=0.2, min_size=10, k=50,
                   xy_std=0.1, wh_std=0.2):
         """
 
+        :param min_size: min size of a box
         :param cls_out: (B, A, K)
         :param regr_out:
         :param max_iou:
@@ -137,9 +138,10 @@ class RetinaNet(nn.Module):
             # gt_wh = s_wh *  A_wh * exp(dwdh)
             wh = picked_regr[:, 2:].exp() * wh_std * picked_boxes[:, 2:]
             box = torch.cat([xy, wh], -1)
-            box = ops.clip_boxes_to_image(ops.box_convert(box, "xywh", "xyxy"),
-                                          (self.img_size, self.img_size))
-            box = ops.box_convert(box, "xyxy", "xywh")  # (k, 4)
+            box_xyxy = ops.box_convert(box, "xywh", "xyxy")
+            box_xyxy = ops.clip_boxes_to_image(box_xyxy, (self.img_size, self.img_size))
+            box_xyxy = ops.remove_small_boxes(box_xyxy, min_size)
+            box = ops.box_convert(box_xyxy, "xyxy", "xywh")  # (k, 4)
             boxes.append(box[None])
             scores.append(top_conf[pick_ids][:k][None])
             labels.append(top_labels[pick_ids][:k][None])
@@ -170,8 +172,6 @@ def train_single_epoch(model, optimizer, anchors, dataloader, cls_crit, reg_crit
         optimizer.step()
         total_loss += loss.item()
         postfix_dict['train/loss'] = loss.item()
-        postfix_dict['train/cls_loss'] = cls_loss.item()
-        postfix_dict['train/regr_loss'] = regr_loss.item()
 
         f_epoch = epoch + i / total_step
         desc = '{:5s}'.format('train')
@@ -198,8 +198,6 @@ def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, post
         regr_loss = (reg_crit(regr_out, reg_target) * (cls_target >= 0)).mean()
         loss = cls_loss + regr_loss
         postfix_dict['val/loss'] = loss.item()
-        postfix_dict['val/cls_loss'] = cls_loss.item()
-        postfix_dict['val/regr_loss'] = regr_loss.item()
 
         pred_boxes, pred_scores, pred_labels = model.inference(cls_out, regr_out, k=k)  # (B, k, _)
         iou = ops.box_iou(ops.box_convert(boxes.view(-1, 4), "xywh", "xyxy"),
@@ -211,6 +209,8 @@ def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, post
         desc += ', {:06d}/{:06d}, {:.2f} epoch'.format(i, total_step, f_epoch)
         tbar.set_description(desc)
         tbar.set_postfix(**postfix_dict)
+
+
 
 
 
