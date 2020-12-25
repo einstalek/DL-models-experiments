@@ -43,7 +43,7 @@ class FocalLoss:
     Huge confusion about negative boxes label
     https://stackoverflow.com/questions/53809995/confusions-regarding-retinanet
     """
-    def __init__(self, alpha=0.5, gamma=2):
+    def __init__(self, alpha=0.25, gamma=2):
         self.alpha = alpha
         self.gamma = gamma
         self._loss = nn.CrossEntropyLoss(reduction='none')
@@ -63,7 +63,8 @@ class FocalLoss:
         targets = targets[filter_mask]  # (N, K)
         outputs = outputs[filter_mask]  # (N, K)
 
-        probas = outputs.sigmoid()
+        # probas = outputs.sigmoid()
+        probas = outputs.softmax(1)
         alpha = torch.where(targets != self._negative_index, self.alpha, 1-self.alpha)
         pt = torch.where(targets != self._negative_index, probas, 1-probas)
         pt = pt.clamp(self.eps, 1-self.eps)
