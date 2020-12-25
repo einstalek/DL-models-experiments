@@ -80,7 +80,7 @@ class RetinaNet(nn.Module):
         self.fpn = FPN(*fmap_channels, out_ch=256)
         self.class_subnet = RetinaConvHead(num_classes * self.anchors_num)
         self.regr_subnet = RetinaConvHead(4 * self.anchors_num)
-        self.anchors = generate_anchor_boxes(fmap_sizes, 8, img_size, scales, ratios, mode="xywh")
+        self.anchors = generate_anchor_boxes(fmap_sizes, 8, img_size, scales, ratios, mode="xywh").float()
         self.num_classes = num_classes
         self.img_size = img_size
 
@@ -121,7 +121,7 @@ class RetinaNet(nn.Module):
         boxes = []
         scores = []
         labels = []
-        conf, pred_labels = cls_out.sigmoid().max(-1)  # (B, A, 1)
+        conf, pred_labels = cls_out.sigmoid().max(-1)  # (B, A, 1
         bsize = cls_out.size(0)
         for i in range(bsize):
             filter_mask = torch.where(conf[i] > min_conf)
@@ -129,8 +129,7 @@ class RetinaNet(nn.Module):
             top_conf = conf[i][filter_mask]  # (N,)
             top_regr = regr_out[i][filter_mask]  # (N, 4)
             top_labels = pred_labels[i][filter_mask]
-            pick_ids = ops.nms(ops.box_convert(top_boxes, "xywh", "xyxy"),
-                               top_conf, max_iou)
+            pick_ids = ops.nms(ops.box_convert(top_boxes, "xywh", "xyxy"), top_conf, max_iou)
             picked_boxes = top_boxes[pick_ids][:k]  # (k, 4)
             picked_regr = top_regr[pick_ids][:k]  # (k, 4)
             # gt_xy = A_wh * s_xy * dxdy + A_xy
@@ -140,7 +139,8 @@ class RetinaNet(nn.Module):
             box = torch.cat([xy, wh], -1)
             box_xyxy = ops.box_convert(box, "xywh", "xyxy")
             box_xyxy = ops.clip_boxes_to_image(box_xyxy, (self.img_size, self.img_size))
-            box_xyxy = ops.remove_small_boxes(box_xyxy, min_size)
+            keep_ids = ops.remove_small_boxes(box_xyxy, min_size)
+            box_xyxy = box_xyxy[keep_ids]
             box = ops.box_convert(box_xyxy, "xyxy", "xywh")  # (k, 4)
             boxes.append(box[None])
             scores.append(top_conf[pick_ids][:k][None])
@@ -211,6 +211,15 @@ def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, post
         tbar.set_postfix(**postfix_dict)
 
 
+if __name__ == "__main__":
+    import numpy as np
+    images = torch.rand(1, 3, 256, 256)
+    boxes = torch.from_numpy(np.array([[[98.8713, 126.6131, 147.6946, 149.5331]]])).float()
+    retina = RetinaNet()
+    cls_out, regr_out = retina(images)
+    pboxes, labels, scores = retina.inference(cls_out, regr_out)
+
+    print(labels.shape)
 
 
 
