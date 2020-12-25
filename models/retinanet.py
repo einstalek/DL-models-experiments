@@ -213,6 +213,9 @@ def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, post
         cls_target = cls_target.cuda()
         reg_target = reg_target.cuda()
 
+        if (cls_target >= 0).sum(1).min() < 1:
+            continue
+
         cls_out, regr_out = model(images)
         cls_loss = cls_crit(cls_out, cls_target)
         regr_loss = (reg_crit(regr_out, reg_target) * (cls_target >= 0)).mean()
