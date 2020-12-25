@@ -185,13 +185,29 @@ def train_single_epoch(model, optimizer, anchors, dataloader,
     total_loss /= len(dataloader)
 
 
+def eval_single_sample(boxes, gt_boxes):
+    """
+    :param boxes: List of (tempK, 4)
+    :param gt_boxes: Tensor (B, tempN, 4)
+    :return:
+    """
+    bsize = gt_boxes.size(0)
+    total_iou = 0.
+    for i in range(bsize):
+        pred = ops.box_convert(boxes[i], "xywh", "xyxy")
+        gt = ops.box_convert(gt_boxes[i], "xywh", "xyxy")
+        iou = ops.box_iou(gt, pred).mean().item()
+        total_iou += iou
+    return total_iou / bsize
+
+
 def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, postfix_dict, epoch, k=10):
     model.eval()
     total_step = len(dataloader)
     tbar = tqdm.tqdm(enumerate(dataloader), total=total_step, position=0, leave=False)
     for i, (images, boxes, labels) in tbar:
         images = images.cuda()
-        boxes = boxes.cuda()  # (B, N, 4)
+        boxes = boxes.cuda()  # (B, _, 4)
         labels = labels.cuda()
         cls_target, reg_target = encode_batch(model.anchors, boxes, labels, 2)
         cls_target = cls_target.cuda()
@@ -203,10 +219,11 @@ def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, post
         loss = cls_loss + regr_loss
         postfix_dict['val/loss'] = loss.item()
 
-        pred_boxes, pred_scores, pred_labels = model.inference(cls_out, regr_out, k=k)  # (B, k, _)
-        iou = ops.box_iou(ops.box_convert(boxes.view(-1, 4), "xywh", "xyxy"),
-                          ops.box_convert(pred_boxes.view(-1, 4), "xywh", "xyxy"))  # (B*N x B*k)
-        postfix_dict['val/iou'] = iou.mean().item()
+        pred_boxes, pred_scores, pred_labels = model.inference(cls_out, regr_out, k=k)
+        eval_single_sample(pred_boxes, boxes)
+
+        iou = eval_single_sample(pred_boxes, boxes)
+        postfix_dict['val/iou'] = iou
 
         f_epoch = epoch + i / total_step
         desc = '{:5s}'.format('val')
@@ -223,7 +240,5 @@ if __name__ == "__main__":
     retina = RetinaNet()
     cls_out, regr_out = retina(images)
     pboxes, labels, scores = retina.inference(cls_out, regr_out)
-
-
-
+    print(eval_single_sample(pboxes, boxes))
 
