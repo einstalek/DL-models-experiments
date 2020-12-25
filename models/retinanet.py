@@ -204,7 +204,7 @@ def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, post
         pred_boxes, pred_scores, pred_labels = model.inference(cls_out, regr_out, k=k)  # (B, k, _)
         iou = ops.box_iou(ops.box_convert(boxes.view(-1, 4), "xywh", "xyxy"),
                           ops.box_convert(pred_boxes.view(-1, 4), "xywh", "xyxy"))  # (B*N x B*k)
-        postfix_dict['val/iou'] = iou.mean()
+        postfix_dict['val/iou'] = iou.mean().item()
 
         f_epoch = epoch + i / total_step
         desc = '{:5s}'.format('val')
