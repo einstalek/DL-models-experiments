@@ -16,6 +16,7 @@ class FPN(nn.Module):
 
         self.upsample = nn.Upsample(scale_factor=2)
         self.side_conv5 = nn.Conv2d(sizes[-1], out_ch, 1)
+        self.merge_conv5 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
         self.side_conv4 = nn.Conv2d(sizes[-2], out_ch, 1)
         self.merge_conv4 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
         self.side_conv3 = nn.Conv2d(sizes[-3], out_ch, 1)
@@ -23,7 +24,7 @@ class FPN(nn.Module):
 
     def forward(self, *fmaps):
         C3, C4, C5 = fmaps
-        P5 = self.side_conv5(C5)
+        P5 = self.merge_conv5(self.side_conv5(C5))
         P4 = self.merge_conv4(self.side_conv4(C4) + self.upsample(P5))
         P3 = self.merge_conv3(self.side_conv3(C3) + self.upsample(P4))
         return P3, P4, P5
@@ -182,12 +183,12 @@ def train_single_epoch(model, optimizer, anchors, dataloader,
         desc += ', {:06d}/{:06d}, {:.2f} epoch'.format(i, total_step, f_epoch)
         tbar.set_description(desc)
         tbar.set_postfix(**postfix_dict)
-    total_loss /= len(dataloader)
+    postfix_dict['train/loss'] = total_loss / len(dataloader)
 
 
-def eval_single_sample(boxes, gt_boxes):
+def eval_single_batch(boxes, gt_boxes):
     """
-    :param boxes: List of (tempK, 4)
+    :param boxes: List of (B, tempK, 4)
     :param gt_boxes: Tensor (B, tempN, 4)
     :return:
     """
@@ -197,6 +198,8 @@ def eval_single_sample(boxes, gt_boxes):
         pred = ops.box_convert(boxes[i], "xywh", "xyxy")
         gt = ops.box_convert(gt_boxes[i], "xywh", "xyxy")
         iou = ops.box_iou(gt, pred).mean().item()
+        if np.isnan(iou):
+            continue
         total_iou += iou
     return total_iou / bsize
 
@@ -204,6 +207,7 @@ def eval_single_sample(boxes, gt_boxes):
 def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, postfix_dict, epoch, k=10):
     model.eval()
     total_step = len(dataloader)
+    total_iou = 0.
     tbar = tqdm.tqdm(enumerate(dataloader), total=total_step, position=0, leave=False)
     for i, (images, boxes, labels) in tbar:
         images = images.cuda()
@@ -223,9 +227,10 @@ def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, post
         postfix_dict['val/loss'] = loss.item()
 
         pred_boxes, pred_scores, pred_labels = model.inference(cls_out, regr_out, k=k)
-        eval_single_sample(pred_boxes, boxes)
+        eval_single_batch(pred_boxes, boxes)
 
-        iou = eval_single_sample(pred_boxes, boxes)
+        iou = eval_single_batch(pred_boxes, boxes)
+        total_iou += iou
         postfix_dict['val/iou'] = iou
 
         f_epoch = epoch + i / total_step
@@ -233,6 +238,7 @@ def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, post
         desc += ', {:06d}/{:06d}, {:.2f} epoch'.format(i, total_step, f_epoch)
         tbar.set_description(desc)
         tbar.set_postfix(**postfix_dict)
+    postfix_dict['val/iou'] = total_iou / len(dataloader)
 
 
 if __name__ == "__main__":
@@ -243,5 +249,5 @@ if __name__ == "__main__":
     retina = RetinaNet()
     cls_out, regr_out = retina(images)
     pboxes, labels, scores = retina.inference(cls_out, regr_out)
-    print(eval_single_sample(pboxes, boxes))
+    print(eval_single_batch(pboxes, boxes))
 
