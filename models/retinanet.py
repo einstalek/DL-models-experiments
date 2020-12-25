@@ -3,6 +3,7 @@ import torchvision
 import torch.nn as nn
 from torchvision import ops
 import tqdm
+import numpy as np
 
 from datasets.utils import encode_batch
 from models.anchors import generate_anchor_boxes
@@ -242,7 +243,6 @@ def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, post
 
 
 if __name__ == "__main__":
-    import numpy as np
     images = torch.rand(8, 3, 256, 256)
     boxes = torch.from_numpy(np.array([[98.8713, 126.6131, 147.6946, 149.5331] * 8,
                                        [89.0334, 132.7554, 152.6815, 152.6237] * 8])).view(8, -1, 4)
