@@ -116,9 +116,9 @@ class RetinaNet(nn.Module):
         :param xy_std:
         :param wh_std:
         :return:
-            -- boxes [B, k, 4]
-            -- scores [B, k]
-            -- labels [B, k]
+            -- boxes
+            -- scores
+            -- labels
         """
         boxes = []
         scores = []
@@ -134,6 +134,7 @@ class RetinaNet(nn.Module):
             pick_ids = ops.nms(ops.box_convert(top_boxes, "xywh", "xyxy"), top_conf, max_iou)
             picked_boxes = top_boxes[pick_ids][:k]  # (k, 4)
             picked_regr = top_regr[pick_ids][:k]  # (k, 4)
+            picked_scores, picked_labels = top_conf[pick_ids][:k], top_labels[pick_ids][:k]
             # gt_xy = A_wh * s_xy * dxdy + A_xy
             xy = picked_boxes[:, 2:] * xy_std * picked_regr[:, :2] + picked_boxes[:, :2]
             # gt_wh = s_wh *  A_wh * exp(dwdh)
@@ -143,11 +144,11 @@ class RetinaNet(nn.Module):
             box_xyxy = ops.clip_boxes_to_image(box_xyxy, (self.img_size, self.img_size))
             keep_ids = ops.remove_small_boxes(box_xyxy, min_size)
             box_xyxy = box_xyxy[keep_ids]
-            box = ops.box_convert(box_xyxy, "xyxy", "xywh")  # (k, 4)
-            boxes.append(box[None])
-            scores.append(top_conf[pick_ids][:k][None])
-            labels.append(top_labels[pick_ids][:k][None])
-        return torch.cat(boxes), torch.cat(labels), torch.cat(scores)
+            box = ops.box_convert(box_xyxy, "xyxy", "xywh")
+            boxes.append(box)
+            scores.append(picked_scores[keep_ids])
+            labels.append(picked_labels[keep_ids])
+        return boxes, labels, scores
 
 
 def train_single_epoch(model, optimizer, anchors, dataloader,
@@ -216,13 +217,13 @@ def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, post
 
 if __name__ == "__main__":
     import numpy as np
-    images = torch.rand(1, 3, 256, 256)
-    boxes = torch.from_numpy(np.array([[[98.8713, 126.6131, 147.6946, 149.5331]]])).float()
+    images = torch.rand(8, 3, 256, 256)
+    boxes = torch.from_numpy(np.array([[98.8713, 126.6131, 147.6946, 149.5331] * 8,
+                                       [89.0334, 132.7554, 152.6815, 152.6237] * 8])).view(8, -1, 4)
     retina = RetinaNet()
     cls_out, regr_out = retina(images)
     pboxes, labels, scores = retina.inference(cls_out, regr_out)
 
-    print(labels.shape)
 
 
 
