@@ -43,13 +43,14 @@ class FocalLoss:
     Huge confusion about negative boxes label
     https://stackoverflow.com/questions/53809995/confusions-regarding-retinanet
     """
-    def __init__(self, alpha=0.25, gamma=2):
+    def __init__(self, alpha=0.25, gamma=2, reduction="mean"):
         self.alpha = alpha
         self.gamma = gamma
-        self._loss = nn.CrossEntropyLoss(reduction='none')
+        self._loss = nn.CrossEntropyLoss(reduction=reduction)
         self._negative_index = -1
         self._ignore_index = -2
         self.eps = 1e-6
+        self.reduction = reduction
 
     def __call__(self, outputs, targets):
         """
@@ -59,6 +60,7 @@ class FocalLoss:
             Output is a matrix of logits for each targeet class  [p11, p12, ..., p1K]
         """
         # Filter out ignored anchors
+        bsize = outputs.size(0)
         filter_mask = torch.where(targets[..., 0] != self._ignore_index)
         targets = targets[filter_mask]  # (N, K)
         outputs = outputs[filter_mask]  # (N, K)
@@ -69,4 +71,11 @@ class FocalLoss:
         pt = torch.where(targets != self._negative_index, probas, 1-probas)
         pt = pt.clamp(self.eps, 1-self.eps)
         loss = -alpha * (1 - pt)**self.gamma * pt.log()
-        return loss.mean()
+        if self.reduction == "none":
+            return loss / bsize
+        elif self.reduction == "sum":
+            return loss.sum() / bsize
+        elif self.reduction == "mean":
+            return loss.mean() / bsize
+        else:
+            raise ValueError

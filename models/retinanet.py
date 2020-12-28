@@ -105,7 +105,7 @@ class RetinaNet(nn.Module):
         return torch.cat(class_out, 1), torch.cat(regr_out, 1)
 
     def inference(self, cls_out, regr_out,
-                  max_iou=0.5, min_conf=0.2, min_size=10, k=50,
+                  max_iou=0.5, min_conf=0.05, min_size=10, k=50,
                   xy_std=0.1, wh_std=0.2):
         """
 
@@ -139,8 +139,8 @@ class RetinaNet(nn.Module):
             picked_scores, picked_labels = top_conf[pick_ids][:k], top_labels[pick_ids][:k]
             # gt_xy = A_wh * s_xy * dxdy + A_xy
             xy = picked_boxes[:, 2:] * xy_std * picked_regr[:, :2] + picked_boxes[:, :2]
-            # gt_wh = s_wh *  A_wh * exp(dwdh)
-            wh = picked_regr[:, 2:].exp() * wh_std * picked_boxes[:, 2:]
+            # gt_wh = A_wh * exp(dwdh * s_wh)
+            wh = (picked_regr[:, 2:] * wh_std).exp() * picked_boxes[:, 2:]
             box = torch.cat([xy, wh], -1)
             box_xyxy = ops.box_convert(box, "cxcywh", "xyxy")
             box_xyxy = ops.clip_boxes_to_image(box_xyxy, (self.img_size, self.img_size))
@@ -153,19 +153,21 @@ class RetinaNet(nn.Module):
         return boxes, labels, scores
 
 
-def train_single_epoch(model, optimizer, anchors, dataloader,
-                       cls_crit, reg_crit, epoch, postfix_dict):
+def train_single_epoch(model: RetinaNet, optimizer, dataloader,
+                       cls_crit, reg_crit, epoch,
+                       postfix_dict={}, device="cpu"):
     model.train()
+    anchors = model.anchors
     total_step = len(dataloader)
     total_loss = 0
     tbar = tqdm.tqdm(enumerate(dataloader), total=total_step, position=0, leave=False)
     for i, (images, boxes, labels) in tbar:
-        images = images.cuda()
-        boxes = boxes.cuda()
-        labels = labels.cuda()
+        images = images.to(device)
+        boxes = boxes.to(device)
+        labels = labels.to(device)
         cls_target, reg_target = encode_batch(anchors, boxes, labels, 2)
-        cls_target = cls_target.cuda()
-        reg_target = reg_target.cuda()
+        cls_target = cls_target.to(device)
+        reg_target = reg_target.to(device)
 
         if (cls_target >= 0).sum(1).min() < 1:
             continue
@@ -205,18 +207,19 @@ def eval_single_batch(boxes, gt_boxes):
     return total_iou / bsize
 
 
-def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, postfix_dict, epoch, k=10):
+def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, epoch,
+                          postfix_dict={}, k=10, device='cpu'):
     model.eval()
     total_step = len(dataloader)
     total_iou = 0.
     tbar = tqdm.tqdm(enumerate(dataloader), total=total_step, position=0, leave=False)
     for i, (images, boxes, labels) in tbar:
-        images = images.cuda()
-        boxes = boxes.cuda()  # (B, _, 4)
-        labels = labels.cuda()
+        images = images.to(device)
+        boxes = boxes.to(device)  # (B, _, 4)
+        labels = labels.to(device)
         cls_target, reg_target = encode_batch(model.anchors, boxes, labels, 2)
-        cls_target = cls_target.cuda()
-        reg_target = reg_target.cuda()
+        cls_target = cls_target.to(device)
+        reg_target = reg_target.to(device)
 
         if (cls_target >= 0).sum(1).min() < 1:
             continue

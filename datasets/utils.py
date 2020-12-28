@@ -29,8 +29,10 @@ def get_targets(anchors, gt_boxes, cls_labels, num_classes,
                 xy_std=0.1, wh_std=0.2,
                 negative_index=-1, ignore_index=-2):
     """
-    :param anchors: [A, 4], "xywh"
-    :param gt_boxes: [N, 4], "xywh"
+    :param ignore_index:
+    :param negative_index:
+    :param anchors: [A, 4], "cxcywh"
+    :param gt_boxes: [N, 4], "cxcywh"
     :param cls_labels: [N], class gt labels
     :param box_scale:
     :param xy_std:
