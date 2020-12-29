@@ -54,7 +54,7 @@ def generate_anchor_boxes(fmap_sizes, subsample, img_size,
 
 if __name__ == "__main__":
     A = generate_anchor_boxes((32, 16, 8), 8, 256,
-                              scales=(0.5, 0.75, 1.25), ratios=(1, 2, 0.5),
+                              scales=(0.25,  0.75, 1.25), ratios=(1, 2, 0.5),
                               mode="xywh", clip=False)
     print(A.shape)  # sum(r * s * size**2)
     img = np.zeros((256, 256, 3))
