@@ -12,23 +12,36 @@ from models.anchors import generate_anchor_boxes
 class FPN(nn.Module):
     def __init__(self, *sizes, out_ch):
         super(FPN, self).__init__()
-        self.sizes = sizes
+        self.sizes = sizes  # (C3, C4, C5)
         self.out_ch = out_ch
 
-        self.upsample = nn.Upsample(scale_factor=2)
         self.side_conv5 = nn.Conv2d(sizes[-1], out_ch, 1)
+        self.upsample5 = nn.Upsample(scale_factor=2)
         self.merge_conv5 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
         self.side_conv4 = nn.Conv2d(sizes[-2], out_ch, 1)
+        self.upsample4 = nn.Upsample(scale_factor=2)
         self.merge_conv4 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
         self.side_conv3 = nn.Conv2d(sizes[-3], out_ch, 1)
+        self.upsample3 = nn.Upsample(scale_factor=2)
         self.merge_conv3 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
+
+        self.conv6 = nn.Conv2d(sizes[-1], out_ch, kernel_size=3, stride=2, padding=1)
 
     def forward(self, *fmaps):
         C3, C4, C5 = fmaps
-        P5 = self.merge_conv5(self.side_conv5(C5))
-        P4 = self.merge_conv4(self.side_conv4(C4) + self.upsample(P5))
-        P3 = self.merge_conv3(self.side_conv3(C3) + self.upsample(P4))
-        return P3, P4, P5
+
+        P5 = self.side_conv5(C5)
+        P5_upsampled = self.upsample5(P5)
+        P5 = self.merge_conv5(P5)
+
+        P4 = self.side_conv4(C4) + P5_upsampled
+        P4_upsampled = self.upsample4(P4)
+        P4 = self.merge_conv4(P4)
+
+        P3 = self.merge_conv3(self.side_conv3(C3) + P4_upsampled)
+
+        P6 = self.conv6(C5)
+        return P3, P4, P5, P6
 
 
 class Resnet50(nn.Module):
@@ -67,26 +80,33 @@ class RetinaConvHead(nn.Module):
             x = self.conv[i](x)
             x = self.relu(x)
             x = self.bn[i](x)
-        x = self.final(x)
-        return x
+        x = self.final(x)  # (B, C, H, W)
+        x = x.permute(0, 2, 3, 1)
+        return x.contiguous()
 
 
 class RetinaNet(nn.Module):
     def __init__(self, pretrained=False, num_classes=2,
-                 img_size=256, scales=(0.5, 0.25), ratios=(1, 0.5, 2)):
+                 img_size=256, scales=(2**0, 2**1/3, 2**2/3), ratios=(1, 0.5, 2), subsample=2.5):
         super(RetinaNet, self).__init__()
         self.backbone = Resnet50(pretrained)
-        fmap_sizes = (32, 16, 8)
+        fmap_sizes = (32, 16, 8, 4)
         fmap_channels = (512, 1024, 2048)
         self.anchors_num = len(ratios) * len(scales)
         self.fpn = FPN(*fmap_channels, out_ch=256)
         self.class_subnet = RetinaConvHead(num_classes * self.anchors_num)
         self.regr_subnet = RetinaConvHead(4 * self.anchors_num)
-        self.anchors = generate_anchor_boxes(fmap_sizes, 8, img_size, scales, ratios, mode="xywh").float()
+        self.anchors = generate_anchor_boxes(fmap_sizes, subsample, img_size, scales, ratios, mode="cxcywh").float()
         self.num_classes = num_classes
         self.img_size = img_size
         self.regr_weight = 1.
         self.cls_weight = 1.
+        # Initialize final layers in subnets
+        prior = 1e-2
+        self.class_subnet.final.weight.data.fill_(0.)
+        self.class_subnet.final.bias.data.fill_(-np.log((1-prior) / prior))
+        self.regr_subnet.final.weight.data.fill_(0.)
+        self.regr_subnet.final.bias.data.fill_(0.)
 
     def forward(self, x):
         """
@@ -125,7 +145,7 @@ class RetinaNet(nn.Module):
         boxes = []
         scores = []
         labels = []
-        conf, pred_labels = cls_out.sigmoid().max(-1)  # (B, A, 1
+        conf, pred_labels = cls_out.sigmoid().max(-1)  # (B, A, 1)
         bsize = cls_out.size(0)
         for i in range(bsize):
             filter_mask = torch.where(conf[i] > min_conf)

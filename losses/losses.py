@@ -42,8 +42,12 @@ class FocalLoss:
     """
     Huge confusion about negative boxes label
     https://stackoverflow.com/questions/53809995/confusions-regarding-retinanet
+
+    Original paper suggests  using alpha=0.25. It makes more sense to use alpha=0.75,
+    since positive anchors are minority
     """
-    def __init__(self, alpha=0.25, gamma=2, reduction="mean", high_conf_reg=0.1):
+    def __init__(self, alpha=0.75, gamma=2, reduction="mean", high_conf_reg=0.):
+
         self.alpha = alpha
         self.gamma = gamma
         self._loss = nn.CrossEntropyLoss(reduction=reduction)
