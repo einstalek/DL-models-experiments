@@ -45,7 +45,7 @@ class FPN(nn.Module):
 
 
 class Resnet50(nn.Module):
-    def __init__(self, pretrained=False):
+    def __init__(self, pretrained=True):
         super(Resnet50, self).__init__()
         base_model = torchvision.models.resnet50(pretrained=pretrained)
         self.layer1 = nn.Sequential(

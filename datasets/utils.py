@@ -56,32 +56,6 @@ def get_targets(anchors, gt_boxes, cls_labels, num_classes,
     return one_hot, regr_target
 
 
-def encode_batch(anchors, boxes, labels, num_classes):
-    """
-    :param anchors: [A, 4]
-    :param boxes: [B, N, 4], xywh
-    :param labels: [B, N]
-    :return:
-    """
-    cls_target, regr_target = [], []
-    batch = boxes.size(0)
-    for i in range(batch):
-        cls, regr = get_targets(anchors, boxes[i], labels[i], num_classes=num_classes)
-        cls_target.append(cls[None])
-        regr_target.append(regr[None])
-    return torch.cat(cls_target), torch.cat(regr_target)
-
-
-if __name__ == "__main__":
-    anchors = generate_anchor_boxes((32, 16, 8), 8, 256, (0.5,), (1, 0.5, 2), mode="xywh")
-    boxes = torch.from_numpy(np.array([[10, 20, 120, 220],
-                                       [120, 120, 250, 190],
-                                       [0, 0, 50, 50]])).view(1, 3, 4)
-    labels = torch.from_numpy(np.array([0, 1, 2])).view(1, 3)
-    targets = encode_batch(anchors, boxes, labels, 3)
-    print(targets[0])
-
-
 def parse_xml(fp):
     obj = {}
     tree = ET.parse(fp)
@@ -108,3 +82,29 @@ def parse_xml(fp):
                 size.append(int(xx.text))
             obj['fmap_size'] = size
     return obj
+
+
+def encode_batch(anchors, boxes, labels, num_classes):
+    """
+    :param anchors: [A, 4]
+    :param boxes: [B, N, 4], xywh
+    :param labels: [B, N]
+    :return:
+    """
+    cls_target, regr_target = [], []
+    batch = boxes.size(0)
+    for i in range(batch):
+        cls, regr = get_targets(anchors, boxes[i], labels[i], num_classes=num_classes)
+        cls_target.append(cls[None])
+        regr_target.append(regr[None])
+    return torch.cat(cls_target), torch.cat(regr_target)
+
+
+if __name__ == "__main__":
+    anchors = generate_anchor_boxes((32, 16, 8), 8, 256, (0.5,), (1, 0.5, 2), mode="xywh")
+    boxes = torch.from_numpy(np.array([[10, 20, 120, 220],
+                                       [120, 120, 250, 190],
+                                       [0, 0, 50, 50]])).view(1, 3, 4)
+    labels = torch.from_numpy(np.array([0, 1, 2])).view(1, 3)
+    targets = encode_batch(anchors, boxes, labels, 3)
+    print(targets[0])
