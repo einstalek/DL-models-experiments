@@ -48,6 +48,7 @@ class Resnet50(nn.Module):
     def __init__(self, pretrained=True):
         super(Resnet50, self).__init__()
         base_model = torchvision.models.resnet50(pretrained=pretrained)
+        self.relu6 = nn.ReLU6()
         self.layer1 = nn.Sequential(
             base_model.conv1,
             base_model.bn1,
@@ -61,9 +62,13 @@ class Resnet50(nn.Module):
 
     def forward(self, x):
         x = self.layer1(x)
+        x = self.relu6(x)
         C3 = self.layer2(x)
+        C3 = self.relu6(C3)
         C4 = self.layer3(C3)
+        C4 = self.relu6(C4)
         C5 = self.layer4(C4)
+        C5 = self.relu6(C5)
         return C3, C4, C5
 
 
@@ -270,7 +275,8 @@ if __name__ == "__main__":
     boxes = torch.from_numpy(np.array([[98.8713, 126.6131, 147.6946, 149.5331] * 8,
                                        [89.0334, 132.7554, 152.6815, 152.6237] * 8])).view(8, -1, 4)
     retina = RetinaNet()
-    cls_out, regr_out = retina(images)
-    pboxes, labels, scores = retina.inference(cls_out, regr_out)
-    print(eval_single_batch(pboxes, boxes))
+    print(retina.backbone)
+    # cls_out, regr_out = retina(images)
+    # pboxes, labels, scores = retina.inference(cls_out, regr_out)
+    # print(eval_single_batch(pboxes, boxes))
 
