@@ -16,30 +16,33 @@ class FPN(nn.Module):
         self.out_ch = out_ch
 
         self.side_conv5 = nn.Conv2d(sizes[-1], out_ch, 1)
+        self.bn5 = nn.BatchNorm2d(sizes[-1], affine=True)
         self.upsample5 = nn.Upsample(scale_factor=2)
         self.merge_conv5 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
         self.side_conv4 = nn.Conv2d(sizes[-2], out_ch, 1)
+        self.bn4 = nn.BatchNorm2d(sizes[-2], affine=True)
         self.upsample4 = nn.Upsample(scale_factor=2)
         self.merge_conv4 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
         self.side_conv3 = nn.Conv2d(sizes[-3], out_ch, 1)
+        self.bn3 = nn.BatchNorm2d(sizes[-3], affine=True)
         self.upsample3 = nn.Upsample(scale_factor=2)
         self.merge_conv3 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
-
         self.conv6 = nn.Conv2d(sizes[-1], out_ch, kernel_size=3, stride=2, padding=1)
+        self.bn6 = nn.BatchNorm2d(sizes[-1], affine=True)
 
     def forward(self, *fmaps):
         C3, C4, C5 = fmaps
 
-        P5 = self.side_conv5(C5)
+        P5 = self.side_conv5(self.bn5(C5))
         P5_upsampled = self.upsample5(P5)
         P5 = self.merge_conv5(P5)
 
-        P4 = self.side_conv4(C4) + P5_upsampled
+        P4 = self.side_conv4(self.bn4(C4)) + P5_upsampled
         P4_upsampled = self.upsample4(P4)
         P4 = self.merge_conv4(P4)
 
-        P3 = self.merge_conv3(self.side_conv3(C3) + P4_upsampled)
-        P6 = self.conv6(C5)
+        P3 = self.merge_conv3(self.side_conv3(self.bn3(C3)) + P4_upsampled)
+        P6 = self.conv6(self.bn6(C5))
         return P3, P4, P5, P6
 
 
@@ -86,8 +89,7 @@ class RetinaConvHead(nn.Module):
 
 class RetinaNet(nn.Module):
     def __init__(self, pretrained=False, num_classes=2, img_size=256,
-                 scales=(2**0, 2**1/3, 2**2/3), ratios=(1, 0.5, 2), subsample=2.5,
-                 high_conf_reg=1e-1):
+                 scales=(2**0, 2**1/3, 2**2/3), ratios=(1, 0.5, 2), subsample=2.5):
         super(RetinaNet, self).__init__()
         self.backbone = Resnet50(pretrained)
         fmap_sizes = (32, 16, 8, 4)
@@ -101,7 +103,6 @@ class RetinaNet(nn.Module):
         self.img_size = img_size
         self.regr_weight = 1.
         self.cls_weight = 1.
-        self.high_conf_reg = high_conf_reg
         # Initialize final layers in subnets
         prior = 1e-2
         self.class_subnet.final.weight.data.fill_(0.)
@@ -123,7 +124,7 @@ class RetinaNet(nn.Module):
         for fmap in fpn_maps:
             class_out.append(self.class_subnet(fmap).view(bsize, -1, self.num_classes))
             regr_out.append(self.regr_subnet(fmap).view(bsize, -1, 4))
-        return torch.cat(class_out, 1), torch.cat(regr_out, 1), fpn_maps[0]
+        return torch.cat(class_out, 1), torch.cat(regr_out, 1)
 
     def inference(self, cls_out, regr_out,
                   max_iou=0.5, min_conf=0.05, min_size=10, k=50,
@@ -193,11 +194,10 @@ def train_single_epoch(model: RetinaNet, optimizer, dataloader,
         if (cls_target >= 0).sum(1).min() < 1:
             continue
 
-        cls_out, reg_out, fmap = model(images)
+        cls_out, reg_out = model(images)
         cls_loss = cls_crit(cls_out, cls_target)
         regr_loss = (reg_crit(reg_out, reg_target) * (cls_target >= 0)).mean()
         loss = model.cls_weight * cls_loss + model.regr_weight * regr_loss
-        loss += model.high_conf_reg * fmap.abs().mean()
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
@@ -246,7 +246,7 @@ def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, epoc
         if (cls_target >= 0).sum(1).min() < 1:
             continue
 
-        cls_out, regr_out, _ = model(images)
+        cls_out, regr_out = model(images)
         cls_loss = cls_crit(cls_out, cls_target)
         regr_loss = (reg_crit(regr_out, reg_target) * (cls_target >= 0)).mean()
         loss = model.cls_weight * cls_loss + model.regr_weight * regr_loss
@@ -272,8 +272,7 @@ if __name__ == "__main__":
     boxes = torch.from_numpy(np.array([[98.8713, 126.6131, 147.6946, 149.5331] * 8,
                                        [89.0334, 132.7554, 152.6815, 152.6237] * 8])).view(8, -1, 4)
     retina = RetinaNet()
-    cls_out, regr_out, x = retina(images)
-    print(x.shape)
+    cls_out, regr_out = retina(images)
     # pboxes, labels, scores = retina.inference(cls_out, regr_out)
     # print(eval_single_batch(pboxes, boxes))
 
