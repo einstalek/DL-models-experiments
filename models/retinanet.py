@@ -15,6 +15,7 @@ class FPN(nn.Module):
         self.sizes = sizes  # (C3, C4, C5)
         self.out_ch = out_ch
 
+        self.relu6 = nn.ReLU6()
         self.side_conv5 = nn.Conv2d(sizes[-1], out_ch, 1)
         self.upsample5 = nn.Upsample(scale_factor=2)
         self.merge_conv5 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
@@ -33,14 +34,17 @@ class FPN(nn.Module):
         P5 = self.side_conv5(C5)
         P5_upsampled = self.upsample5(P5)
         P5 = self.merge_conv5(P5)
+        P5 = self.relu6(P5)
 
         P4 = self.side_conv4(C4) + P5_upsampled
         P4_upsampled = self.upsample4(P4)
         P4 = self.merge_conv4(P4)
+        P4 = self.relu6(P4)
 
         P3 = self.merge_conv3(self.side_conv3(C3) + P4_upsampled)
+        P3 = self.relu6(P3)
 
-        P6 = self.conv6(C5)
+        P6 = self.relu6(self.conv6(C5))
         return P3, P4, P5, P6
 
 
