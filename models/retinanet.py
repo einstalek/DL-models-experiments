@@ -16,33 +16,44 @@ class FPN(nn.Module):
         self.out_ch = out_ch
 
         self.side_conv5 = nn.Conv2d(sizes[-1], out_ch, 1)
-        self.bn5 = nn.BatchNorm2d(sizes[-1], affine=True)
+        self._init(self.side_conv5)
+        # self.bn5 = nn.BatchNorm2d(sizes[-1], affine=True)
         self.upsample5 = nn.Upsample(scale_factor=2)
         self.merge_conv5 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
+        self._init(self.merge_conv5)
         self.side_conv4 = nn.Conv2d(sizes[-2], out_ch, 1)
-        self.bn4 = nn.BatchNorm2d(sizes[-2], affine=True)
+        self._init(self.side_conv4)
+        # self.bn4 = nn.BatchNorm2d(sizes[-2], affine=True)
         self.upsample4 = nn.Upsample(scale_factor=2)
         self.merge_conv4 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
+        self._init(self.merge_conv4)
         self.side_conv3 = nn.Conv2d(sizes[-3], out_ch, 1)
-        self.bn3 = nn.BatchNorm2d(sizes[-3], affine=True)
+        self._init(self.side_conv3)
+        # self.bn3 = nn.BatchNorm2d(sizes[-3], affine=True)
         self.upsample3 = nn.Upsample(scale_factor=2)
         self.merge_conv3 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
+        self._init(self.merge_conv3)
         self.conv6 = nn.Conv2d(sizes[-1], out_ch, kernel_size=3, stride=2, padding=1)
-        self.bn6 = nn.BatchNorm2d(sizes[-1], affine=True)
+        self._init(self.conv6)
+        # self.bn6 = nn.BatchNorm2d(sizes[-1], affine=True)
+
+    def _init(self, layer):
+        torch.nn.init.xavier_normal_(layer.weight)
+        torch.nn.init.zeros_(layer.bias)
 
     def forward(self, *fmaps):
         C3, C4, C5 = fmaps
 
-        P5 = self.side_conv5(self.bn5(C5))
+        P5 = self.side_conv5(C5)
         P5_upsampled = self.upsample5(P5)
         P5 = self.merge_conv5(P5)
 
-        P4 = self.side_conv4(self.bn4(C4)) + P5_upsampled
+        P4 = self.side_conv4(C4) + P5_upsampled
         P4_upsampled = self.upsample4(P4)
         P4 = self.merge_conv4(P4)
 
-        P3 = self.merge_conv3(self.side_conv3(self.bn3(C3)) + P4_upsampled)
-        P6 = self.conv6(self.bn6(C5))
+        P3 = self.merge_conv3(self.side_conv3(C3) + P4_upsampled)
+        P6 = self.conv6(C5)
         return P3, P4, P5, P6
 
 
@@ -72,10 +83,15 @@ class Resnet50(nn.Module):
 class RetinaConvHead(nn.Module):
     def __init__(self, out_ch, in_ch=256):
         super(RetinaConvHead, self).__init__()
-        self.conv = nn.ModuleList([nn.Conv2d(in_ch, in_ch, 3, padding=1) for _ in range(4)])
+        self.conv = nn.ModuleList([self._init(nn.Conv2d(in_ch, in_ch, 3, padding=1)) for _ in range(4)])
         self.bn = nn.ModuleList([nn.BatchNorm2d(in_ch) for _ in range(4)])
         self.relu = nn.ReLU()
         self.final = nn.Conv2d(in_ch, out_ch, 3, padding=1)
+
+    def _init(self, layer):
+        torch.nn.init.zeros_(layer.bias)
+        torch.nn.init.normal_(layer.weight, 0, 1e-2)
+        return layer
 
     def forward(self, x):
         for i in range(4):
@@ -105,10 +121,10 @@ class RetinaNet(nn.Module):
         self.cls_weight = 1.
         # Initialize final layers in subnets
         prior = 1e-2
-        self.class_subnet.final.weight.data.fill_(0.)
         self.class_subnet.final.bias.data.fill_(-np.log((1-prior) / prior))
-        self.regr_subnet.final.weight.data.fill_(0.)
         self.regr_subnet.final.bias.data.fill_(0.)
+        torch.nn.init.normal_(self.class_subnet.final.weight, 0, 1e-2)
+        torch.nn.init.normal_(self.regr_subnet.final.weight, 0, 1e-2)
 
     def forward(self, x):
         """
