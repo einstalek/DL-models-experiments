@@ -17,25 +17,25 @@ class FPN(nn.Module):
 
         self.side_conv5 = nn.Conv2d(sizes[-1], out_ch, 1)
         self._init(self.side_conv5)
-        # self.bn5 = nn.BatchNorm2d(sizes[-1], affine=True)
+        self.bn5 = nn.BatchNorm2d(sizes[-1], affine=False)
         self.upsample5 = nn.Upsample(scale_factor=2)
         self.merge_conv5 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
         self._init(self.merge_conv5)
         self.side_conv4 = nn.Conv2d(sizes[-2], out_ch, 1)
         self._init(self.side_conv4)
-        # self.bn4 = nn.BatchNorm2d(sizes[-2], affine=True)
+        self.bn4 = nn.BatchNorm2d(sizes[-2], affine=False)
         self.upsample4 = nn.Upsample(scale_factor=2)
         self.merge_conv4 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
         self._init(self.merge_conv4)
         self.side_conv3 = nn.Conv2d(sizes[-3], out_ch, 1)
         self._init(self.side_conv3)
-        # self.bn3 = nn.BatchNorm2d(sizes[-3], affine=True)
+        self.bn3 = nn.BatchNorm2d(sizes[-3], affine=False)
         self.upsample3 = nn.Upsample(scale_factor=2)
         self.merge_conv3 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
         self._init(self.merge_conv3)
         self.conv6 = nn.Conv2d(sizes[-1], out_ch, kernel_size=3, stride=2, padding=1)
         self._init(self.conv6)
-        # self.bn6 = nn.BatchNorm2d(sizes[-1], affine=True)
+        self.bn6 = nn.BatchNorm2d(sizes[-1], affine=False)
 
     def _init(self, layer):
         torch.nn.init.xavier_normal_(layer.weight)
@@ -44,16 +44,16 @@ class FPN(nn.Module):
     def forward(self, *fmaps):
         C3, C4, C5 = fmaps
 
-        P5 = self.side_conv5(C5)
+        P5 = self.side_conv5(self.bn5(C5))
         P5_upsampled = self.upsample5(P5)
         P5 = self.merge_conv5(P5)
 
-        P4 = self.side_conv4(C4) + P5_upsampled
+        P4 = self.side_conv4(self.bn4(C4)) + P5_upsampled
         P4_upsampled = self.upsample4(P4)
         P4 = self.merge_conv4(P4)
 
-        P3 = self.merge_conv3(self.side_conv3(C3) + P4_upsampled)
-        P6 = self.conv6(C5)
+        P3 = self.merge_conv3(self.side_conv3(self.bn3(C3)) + P4_upsampled)
+        P6 = self.conv6(self.bn6(C5))
         return P3, P4, P5, P6
 
 

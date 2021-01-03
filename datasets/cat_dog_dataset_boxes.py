@@ -12,7 +12,8 @@ from utils.augm import transform_fn, normalize_fn
 
 class CatDogDataset:
     def __init__(self, xml_dir, img_dir, xml_fps, shape=(256, 256),
-                 num_classes=2, split='train', return_fp=False):
+                 num_classes=2, split='train',
+                 return_fp=False, mixup=False):
         super(CatDogDataset, self).__init__()
         self.xml_dir = xml_dir
         self.img_dir = img_dir
@@ -22,6 +23,7 @@ class CatDogDataset:
         self.class_idx = {'cat': 0, 'dog': 1}
         self.split = split
         self.return_fp = return_fp
+        self.mixup = mixup
 
     def _load_sample(self, xml_fp):
         obj = parse_xml(os.path.join(self.xml_dir, xml_fp))
@@ -56,17 +58,36 @@ class CatDogDataset:
         img, ann = self._load_sample(xml_fp)
         img, pads, bbox = self._preprocess_image(img, ann['bbox'])
 
+        boxes = [bbox, ]
+        labels = [self.class_idx[ann['name']], ]
+
+        # mixup
+        if self.split == "train" and self.mixup and random.random() > 0.5:
+            add_idx = random.randint(0, len(self) - 1)
+            if add_idx != idx:
+                print(add_idx)
+                add_xml_fp = self.xml_fps[add_idx]
+                add_img, add_ann = self._load_sample(add_xml_fp)
+                add_img, add_pads, add_box = self._preprocess_image(add_img, add_ann['bbox'])
+                img = (0.5 * img + 0.5 * add_img).astype(np.uint8)
+                boxes.append(add_box)
+                labels.append(self.class_idx[add_ann['name']])
+
         if self.split == 'train':
-            args = {'image': img, 'bboxes': [bbox,]}
+            args = {'image': img, 'bboxes': boxes}
             augm = transform_fn(**args)
-            img, bbox = augm['image'], augm['bboxes'][0]  # box is x1y1x2y2
-        x1, y1, x2, y2 = np.array(bbox) * 256
-        cx, cy, w, h = (x1+x2)/2, (y1+y2)/2, (x2-x1), (y2-y1)
+            img, boxes = augm['image'], augm['bboxes']  # box is x1y1x2y2
+        gt_boxes = []
+        for bbox in boxes:
+            x1, y1, x2, y2 = np.array(bbox) * 256
+            cx, cy, w, h = (x1+x2)/2, (y1+y2)/2, (x2-x1), (y2-y1)
+            gt_boxes.append([cx, cy, w, h])
         img = img / 255.
         img = normalize_fn(img).float()
-        box = torch.from_numpy(np.array([cx, cy, w, h])).float()[None]
-        labels = np.array([self.class_idx[ann['name']]])
-        labels = torch.from_numpy(labels).long()
+        box = torch.from_numpy(np.array(gt_boxes)).float()
+
+        labels = np.array(labels)
+        labels = torch.from_numpy(labels[..., None]).long()
         return img, box, labels
 
     def __len__(self):
