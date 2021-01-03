@@ -65,7 +65,6 @@ class CatDogDataset:
         if self.split == "train" and self.mixup and random.random() > 0.5:
             add_idx = random.randint(0, len(self) - 1)
             if add_idx != idx:
-                print(add_idx)
                 add_xml_fp = self.xml_fps[add_idx]
                 add_img, add_ann = self._load_sample(add_xml_fp)
                 add_img, add_pads, add_box = self._preprocess_image(add_img, add_ann['bbox'])
