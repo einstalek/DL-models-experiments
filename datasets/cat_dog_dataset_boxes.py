@@ -86,7 +86,7 @@ class CatDogDataset:
         box = torch.from_numpy(np.array(gt_boxes)).float()
 
         labels = np.array(labels)
-        labels = torch.from_numpy(labels[..., None]).long()
+        labels = torch.from_numpy(labels).long()
         return img, box, labels
 
     def __len__(self):
