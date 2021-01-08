@@ -90,7 +90,7 @@ class RetinaConvHead(nn.Module):
         return layer
 
     def forward(self, x):
-        for i in range(4):
+        for i in range(5):
             x = self.conv[i](x)
             x = self.relu(x)
             x = self.bn[i](x)
@@ -194,7 +194,7 @@ def train_single_epoch(model: RetinaNet, optimizer, dataloader,
     anchors = model.anchors
     total_step = len(dataloader)
     total_loss = 0
-    tbar = tqdm.tqdm(enumerate(dataloader), total=total_step, position=0, leave=False)
+    tbar = tqdm.tqdm(enumerate(dataloader), total=total_step, position=0, leave=True)
     for i, (images, boxes, labels) in tbar:
         images = images.to(device)
         boxes = boxes.to(device)
@@ -250,7 +250,7 @@ def evaluale_single_epoch(model: RetinaNet, dataloader, cls_crit, reg_crit, epoc
     model.eval()
     total_step = len(dataloader)
     total_iou = 0.
-    tbar = tqdm.tqdm(enumerate(dataloader), total=total_step, position=0, leave=False)
+    tbar = tqdm.tqdm(enumerate(dataloader), total=total_step, position=0, leave=True)
     for i, (images, boxes, labels) in tbar:
         images = images.to(device)
         boxes = boxes.to(device)  # (B, _, 4)
