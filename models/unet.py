@@ -24,7 +24,7 @@ class UnetConvBlock(nn.Module):
 
 
 class UnetBlockUp(nn.Module):
-    def __init__(self, in_ch, prev_ch=None, up_type='upsample'):
+    def __init__(self, in_ch, prev_ch=None, up_type='upsample', dropout=None):
         super(UnetBlockUp, self).__init__()
         out_ch = in_ch // 2
         if prev_ch is None:
@@ -37,16 +37,22 @@ class UnetBlockUp(nn.Module):
         else:
             self.upconv = nn.ConvTranspose2d(in_ch, out_ch, 2, 2)
         self.conv = UnetConvBlock(out_ch + prev_ch, out_ch, dropout=0)
+        self.dropout = None
+        if dropout is not None:
+            self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, skip):
         x = self.upconv(x)
         x = torch.cat([x, skip], 1)
         x = self.conv(x)
+        if self.dropout is not None:
+            x = self.dropout(x)
         return x
 
 
 class Unet(nn.Module):
-    def __init__(self, num_classes=2, dropout=0.2, activation=None):
+    def __init__(self, num_classes=2, dropout=0.2,
+                 activation=None, decoder_dropout=None):
         super(Unet, self).__init__()
         self.num_classes = num_classes
         self.activation = activation
@@ -59,9 +65,9 @@ class Unet(nn.Module):
         self.down4 = UnetConvBlock(256, 512, dropout)
         self.down5 = UnetConvBlock(512, 1024, dropout)
 
-        self.up5 = UnetBlockUp(1024)
-        self.up4 = UnetBlockUp(512)
-        self.up3 = UnetBlockUp(256)
+        self.up5 = UnetBlockUp(1024, dropout=decoder_dropout)
+        self.up4 = UnetBlockUp(512, dropout=decoder_dropout)
+        self.up3 = UnetBlockUp(256, dropout=decoder_dropout)
         self.up2 = UnetBlockUp(128)
         self.final = nn.Conv2d(64, num_classes, 1)
 
