@@ -208,7 +208,9 @@ def train_single_epoch(model: RetinaNet, optimizer, dataloader,
 
         cls_out, reg_out = model(images)
         cls_loss = cls_crit(cls_out, cls_target)
-        regr_loss = (reg_crit(reg_out, reg_target) * (cls_target >= 0)).mean()
+        regr_loss = reg_crit(reg_out, reg_target) * (cls_target >= 0)
+        regr_loss /= (cls_target >= 0).sum()
+        regr_loss = regr_loss.sum()
         loss = model.cls_weight * cls_loss + model.regr_weight * regr_loss
         loss.backward()
 
