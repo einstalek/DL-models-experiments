@@ -72,8 +72,8 @@ class FocalLoss:
 
         # probas = outputs.softmax(1)
         probas = outputs.sigmoid()
-        alpha = torch.where(targets != 1, self.alpha, 1-self.alpha)
-        pt = torch.where(targets != 1, probas, 1-probas)
+        alpha = torch.where(targets == 1, self.alpha, 1-self.alpha)
+        pt = torch.where(targets == 1, probas, 1-probas)
         pt = pt.clamp(self.eps, 1-self.eps)
         loss = -alpha * (1 - pt)**self.gamma * pt.log() + self.high_conf_reg * outputs.abs().mean()
         if self.reduction == "none":
