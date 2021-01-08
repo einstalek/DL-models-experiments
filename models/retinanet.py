@@ -79,8 +79,8 @@ class Resnet50(nn.Module):
 class RetinaConvHead(nn.Module):
     def __init__(self, out_ch, in_ch=256):
         super(RetinaConvHead, self).__init__()
-        self.conv = nn.ModuleList([self._init(nn.Conv2d(in_ch, in_ch, 3, padding=1)) for _ in range(4)])
-        self.bn = nn.ModuleList([nn.BatchNorm2d(in_ch) for _ in range(4)])
+        self.conv = nn.ModuleList([self._init(nn.Conv2d(in_ch, in_ch, 3, padding=1)) for _ in range(5)])
+        self.bn = nn.ModuleList([nn.BatchNorm2d(in_ch) for _ in range(5)])
         self.relu = nn.ReLU()
         self.final = nn.Conv2d(in_ch, out_ch, 3, padding=1)
 
