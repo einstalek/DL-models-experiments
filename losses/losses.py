@@ -70,8 +70,8 @@ class FocalLoss:
         targets = targets[filter_mask]  # (N, K)
         outputs = outputs[filter_mask]  # (N, K)
 
-        # probas = outputs.sigmoid()
-        probas = outputs.softmax(1)
+        # probas = outputs.softmax(1)
+        probas = outputs.sigmoid()
         alpha = torch.where(targets != self._negative_index, self.alpha, 1-self.alpha)
         pt = torch.where(targets != self._negative_index, probas, 1-probas)
         pt = pt.clamp(self.eps, 1-self.eps)
