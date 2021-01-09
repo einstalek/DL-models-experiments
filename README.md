@@ -13,4 +13,4 @@ RetinaNet | 46.38 | 68.65 | 57.52
 ## Image generation on [Facades dataset](https://www.kaggle.com/balraj98/facades-dataset)
 Model  |  Generated samples
 :--:|:--:
-pix2pix
+pix2pix  |  <img src="./images/pix2pix_samples.png " width="200" height="200">
