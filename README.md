@@ -11,7 +11,6 @@ Unet + SEBlocks  | 95.19 | 86.73 | 90.96
 RetinaNet | 46.38 | 68.65 | 57.52
 
 ## Image generation on [Facades dataset](https://www.kaggle.com/balraj98/facades-dataset)
-Model  |  Generated samples
-:--:|:--:
-pix2pix  |  <img src="./images/pix2pix_samples.png " width="256" height="256">
-sagan  |  <img src="./images/sagan_facades.png " width="256" height="256">
+Model  |  pix2pix | sagan
+:--:|:--:|:--:
+Samples | <img src="./images/pix2pix_samples.png " width="256" height="256"> | <img src="./images/sagan_facades.png " width="256" height="256">
