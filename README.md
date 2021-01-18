@@ -14,3 +14,4 @@ RetinaNet | 46.38 | 68.65 | 57.52
 Model  |  Generated samples
 :--:|:--:
 pix2pix  |  <img src="./images/pix2pix_samples.png " width="256" height="256">
+sagan  |  <img src="./images/sagan_facades.png " width="256" height="256">
