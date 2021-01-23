@@ -51,7 +51,7 @@ class UnetBlockUp(nn.Module):
 
 
 class Unet(nn.Module):
-    def __init__(self, num_classes=2, dropout=0.2,
+    def __init__(self, in_ch=3, num_classes=2, dropout=0.2,
                  activation=None, decoder_dropout=None):
         super(Unet, self).__init__()
         self.num_classes = num_classes
@@ -59,7 +59,7 @@ class Unet(nn.Module):
         self.dropout = dropout
 
         self.pool = nn.MaxPool2d(2)
-        self.down1 = UnetConvBlock(3, 64, dropout)
+        self.down1 = UnetConvBlock(in_ch, 64, dropout)
         self.down2 = UnetConvBlock(64, 128, dropout)
         self.down3 = UnetConvBlock(128, 256, dropout)
         self.down4 = UnetConvBlock(256, 512, dropout)
