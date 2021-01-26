@@ -165,5 +165,3 @@ def train(gen, disc, optimizer_g, optimizer_d, dataloader, logger, epochs=10, cl
         display.clear_output(wait=True)
         plt.imshow(x.detach().cpu().numpy()[0].transpose(1, 2, 0))
         plt.show()
-
-
