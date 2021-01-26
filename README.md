@@ -13,7 +13,7 @@ Unet  | 51.62 | 67.31 | 59.47
 Unet + SEBlocks  | 95.19 | 86.73 | 90.96
 RetinaNet | 46.38 | 68.65 | 57.52
 
-Samples for **SEUnet**
+Result samples from **SEUnet**
 
 <img src="./images/cat_dog_seunet.png " width="384" height="384">
 
