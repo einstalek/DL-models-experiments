@@ -43,7 +43,8 @@ class UnetBlockUp(nn.Module):
 
     def forward(self, x, skip):
         x = self.upconv(x)
-        x = torch.cat([x, skip], 1)
+        if skip is not None:
+            x = torch.cat([x, skip], 1)
         x = self.conv(x)
         if self.dropout is not None:
             x = self.dropout(x)
