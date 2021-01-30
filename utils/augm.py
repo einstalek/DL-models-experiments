@@ -7,7 +7,7 @@ transform_fn = A.Compose([
     A.HorizontalFlip(),
     A.GaussNoise(),
     A.ChannelShuffle(),
-    A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=60)
+    A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=60),
 ])
 
 normalize_fn = T.Compose([
