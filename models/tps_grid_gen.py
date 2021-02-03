@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
 
 
@@ -145,21 +144,9 @@ class TpsGridGen(nn.Module):
 
 
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-    grid_size = 3
+    grid_size = 10
     N = 2 * grid_size**2
     theta = torch.randn(1, N) * 0.5
     model = TpsGridGen(grid_size=grid_size)
     grid = model(theta)
-    img = np.zeros((256, 192, 3))
-    cx, cy = 96, 128
-    rad = 5
-    for xx in range(cx-rad, cx+rad):
-        for yy in range(cy-rad, cy+rad):
-            if (xx-cx)**2 + (yy-cy)**2 <= rad**2:
-                img[yy, xx] = 1
-    img = torch.from_numpy(img).view(1, 3, 256, 192).float()
-    warped = F.grid_sample(img, grid)
 
-    plt.imshow(warped.detach().cpu().numpy()[0].transpose(1, 2, 0))
-    plt.show()
