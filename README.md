@@ -25,4 +25,5 @@ Samples | <img src="./images/pix2pix_samples.png " width="256" height="256"> | <
 ## Deep Fashion on [Viton dataset](https://github.com/xthan/VITON)
 
 Reproduced models and pipeline from [VITON: An Image-based Virtual Try-on Network](https://arxiv.org/pdf/1711.08447.pdf)
+
 Result samples | <img src="./images/viton.png " width="448" height="448">
