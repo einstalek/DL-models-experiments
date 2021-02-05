@@ -3,7 +3,7 @@ from xml.etree import ElementTree as ET
 import numpy as np
 import torch
 from torchvision import ops
-from models.anchors import generate_anchor_boxes
+from utils.anchors import generate_anchor_boxes
 
 
 def match_anchors_with_boxes(anchors, boxes, match_iou=0.5, ignore_iou=0.4):

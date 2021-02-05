@@ -6,7 +6,7 @@ import tqdm
 import numpy as np
 
 from datasets.utils import encode_batch
-from models.anchors import generate_anchor_boxes
+from utils.anchors import generate_anchor_boxes
 
 
 class FPN(nn.Module):
