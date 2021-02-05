@@ -40,7 +40,7 @@ class LossNetwork(torch.nn.Module):
 class PerceptualLoss:
     def __init__(self, device='cuda', crit=None):
         self.device = device
-        self.vgg_model = vgg.vgg19(pretrained=True).eval()
+        self.vgg_model = vgg.vgg19(pretrained=True).eval().to(device)
         self.loss_model = LossNetwork(self.vgg_model, device=device)
         self.crit = crit
         if self.crit is None:
