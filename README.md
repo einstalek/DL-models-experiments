@@ -26,6 +26,5 @@ Samples | <img src="./images/pix2pix_samples.png " width="256" height="256"> | <
 
 The model is complex and consists of multiple stages
 
-Stage | Result 
-:--:|:--:
-Coarse transform | <img src="./images/unet_viton_coarse.png " width="384" height="384">
+Reproduced models and pipeline from [VITON: An Image-based Virtual Try-on Network](https://arxiv.org/pdf/1711.08447.pdf)
+Result samples | <img src="./images/viton.png " width="448" height="448">
