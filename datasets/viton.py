@@ -164,10 +164,12 @@ class DescriptorDataset(Dataset):
                                cloth], axis=2)
         upper_cloth_mask = np.where(np.abs(image_mask - 1.3294117) < 0.1, 1, 0)
 
+        image_mask = (image_mask - image_mask.min()) / (image_mask.max() - image.min())
         return self.preprocess(desc), \
                self.preprocess(image), \
                self.preprocess(upper_cloth_mask), \
-               self.preprocess(cloth_mask)
+               self.preprocess(cloth_mask), \
+               self.preprocess(image_mask)
 
     def binary_mask(self, kps, ids=None, rad=None):
         """
