@@ -1,5 +1,4 @@
 # Random Deep Learning experiments
-$$E = mc^2$$
 
 - See training code and inference results in [notebooks](https://github.com/einstalek/DL-models-experiments/tree/master/notebooks)
 - Implemented models are in [models](https://github.com/einstalek/DL-models-experiments/tree/master/models)
